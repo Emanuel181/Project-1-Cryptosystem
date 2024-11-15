@@ -1,0 +1,17 @@
+/* FlowDiagram.css */
+
+.graph-container {
+  height: 600px;
+  width: 800px;
+  border: 2px solid #007bff;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  background-color: #f8f9fa;
+  overflow: auto;
+  margin: 20px auto;
+  transition: box-shadow 0.3s ease;
+}
+
+.graph-container:hover {
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+}
