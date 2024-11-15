@@ -1,0 +1,32 @@
+/* StateMatrix.css */
+
+.matrix-container {
+  display: flex;
+  justify-content: flex-start;
+  margin: 20px 0;
+}
+
+.state-matrix {
+  border-collapse: collapse;
+}
+
+.state-matrix td {
+  width: 60px;
+  height: 60px;
+  text-align: center;
+  vertical-align: middle;
+  border: 1px solid #ccc;
+  font-size: 20px;
+  font-family: 'Courier New', Courier, monospace;
+  color: #fff;
+  transition: background-color 0.5s, transform 0.2s, box-shadow 0.2s;
+  position: relative;
+  cursor: pointer;
+}
+
+.state-matrix td:hover {
+  transform: scale(1.1);
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.3);
+}
+
+

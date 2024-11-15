@@ -1,0 +1,52 @@
+/* CustomNode.css */
+
+.custom-node {
+  border: 2px solid #555;
+  border-radius: 10px;
+  padding: 10px;
+  background-color: #fff;
+  min-width: 200px;
+  text-align: center;
+  font-family: Arial, sans-serif;
+}
+
+.custom-node-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.custom-node-icon {
+  font-size: 24px;
+  margin-right: 10px;
+}
+
+.custom-node-label {
+  font-weight: bold;
+  font-size: 18px;
+}
+
+.custom-node-body {
+  margin-top: 10px;
+  font-size: 14px;
+}
+
+.custom-node.plaintext {
+  border-color: #007bff;
+  background-color: #e7f1ff;
+}
+
+.custom-node.ciphertext {
+  border-color: #28a745;
+  background-color: #e7f9ee;
+}
+
+.custom-node.operation {
+  border-color: #ffc107;
+  background-color: #fffbea;
+}
+
+.custom-node.round {
+  border-color: #17a2b8;
+  background-color: #e7f7fa;
+}
