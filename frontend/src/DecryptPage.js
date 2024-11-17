@@ -1,8 +1,58 @@
 import React, { useState } from 'react';
 import {
-  Box, Typography, AppBar, Toolbar, Paper, TextField, Button, Grid, Snackbar, Alert
+  Box,
+  Typography,
+  Paper,
+  TextField,
+  Button,
+  Grid,
+  Snackbar,
+  Alert,
 } from '@mui/material';
 import axios from 'axios';
+
+// Utility Functions
+const parseByteString = (byteStr) => {
+  try {
+    const hexValues = byteStr.replace(/\s+/g, '').split('\\x').filter(Boolean);
+    if (hexValues.length === 0) {
+      throw new Error('Key is not in valid byte string format.');
+    }
+    const chars = hexValues.map((hex) => {
+      const parsedInt = parseInt(hex, 16);
+      if (isNaN(parsedInt)) {
+        throw new Error('Invalid byte value in Key!');
+      }
+      return String.fromCharCode(parsedInt);
+    });
+    return chars.join('');
+  } catch (error) {
+    throw new Error('Invalid Key format! Please ensure it is a valid byte string.');
+  }
+};
+
+const parseInputData = (input) => {
+  const encryptedTextMatch = input.match(/Encrypted Text:\s*([\s\S]*?)\n\s*Key:/);
+  const keyMatch = input.match(/Key:\s*([\s\S]*?)\n\s*Bitshift Matrices:/);
+  const bitshiftMatricesMatch = input.match(/Bitshift Matrices:\s*([\s\S]*)$/);
+
+  if (!encryptedTextMatch || !keyMatch || !bitshiftMatricesMatch) {
+    return null;
+  }
+
+  const encryptedText = encryptedTextMatch[1].trim();
+  const key = keyMatch[1].trim();
+  const bitshiftMatricesStr = bitshiftMatricesMatch[1].trim();
+
+  let bitshiftMatrices = [];
+  try {
+    bitshiftMatrices = JSON.parse(bitshiftMatricesStr);
+  } catch (e) {
+    return null;
+  }
+
+  return { encryptedText, key, bitshiftMatrices };
+};
 
 function DecryptPage() {
   const [encryptedText, setEncryptedText] = useState('');
@@ -13,6 +63,7 @@ function DecryptPage() {
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [isInvalidFormat, setIsInvalidFormat] = useState(false);
 
+  // Handlers
   const handleDecrypt = () => {
     try {
       // Parse the key (always in byte string format)
@@ -34,6 +85,9 @@ function DecryptPage() {
         })
         .then((response) => {
           setDecryptedText(response.data.decrypted_text);
+          setSnackbarMessage('Decryption successful!');
+          setIsInvalidFormat(false);
+          setOpenSnackbar(true);
         })
         .catch((error) => {
           console.error('Decryption failed!', error);
@@ -46,25 +100,6 @@ function DecryptPage() {
       setSnackbarMessage(error.message);
       setIsInvalidFormat(true);
       setOpenSnackbar(true);
-    }
-  };
-
-  const parseByteString = (byteStr) => {
-    try {
-      const hexValues = byteStr.replace(/\s+/g, '').split('\\x').filter(Boolean);
-      if (hexValues.length === 0) {
-        throw new Error('Key is not in valid byte string format.');
-      }
-      const chars = hexValues.map((hex) => {
-        const parsedInt = parseInt(hex, 16);
-        if (isNaN(parsedInt)) {
-          throw new Error('Invalid byte value in Key!');
-        }
-        return String.fromCharCode(parsedInt);
-      });
-      return chars.join('');
-    } catch (error) {
-      throw new Error('Invalid Key format! Please ensure it is a valid byte string.');
     }
   };
 
@@ -99,39 +134,6 @@ function DecryptPage() {
     }
   };
 
-  const parseInputData = (input) => {
-    const encryptedTextMatch = input.match(/Encrypted Text:\s*([\s\S]*?)\n\s*Key:/);
-    const keyMatch = input.match(/Key:\s*([\s\S]*?)\n\s*Bitshift Matrices:/);
-    const bitshiftMatricesMatch = input.match(/Bitshift Matrices:\s*([\s\S]*)$/);
-
-    if (!encryptedTextMatch || !keyMatch || !bitshiftMatricesMatch) {
-      return null;
-    }
-
-    const encryptedText = encryptedTextMatch[1].trim();
-    const key = keyMatch[1].trim();
-    const bitshiftMatricesStr = bitshiftMatricesMatch[1].trim();
-
-    let bitshiftMatrices = [];
-    try {
-      bitshiftMatrices = JSON.parse(bitshiftMatricesStr);
-    } catch (e) {
-      return null;
-    }
-
-    return { encryptedText, key, bitshiftMatrices };
-  };
-
-  // Handle paste event (Ctrl+V)
-  const handlePaste = (event) => {
-    const pastedData = event.clipboardData.getData('Text');
-    const parsedData = parseInputData(pastedData);
-    if (parsedData) {
-      event.preventDefault(); // Prevent default paste action if data is in special format
-      handleSpecialPaste(pastedData);
-    }
-  };
-
   // Handle "Paste Special" button click
   const handlePasteSpecial = async () => {
     try {
@@ -153,24 +155,45 @@ function DecryptPage() {
   };
 
   return (
-    <Box sx={{ p: 3, bgcolor: '#28293d', color: '#fff', flex: 1 }}>
+    <Box
+      sx={{
+        p: 3,
+        bgcolor: '#f5f5f5',
+        color: '#333',
+        minHeight: '100vh',
+        fontFamily: 'Raleway, sans-serif',
+      }}
+    >
       <Grid container spacing={3}>
         <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 3, bgcolor: '#1e1e2d', borderRadius: 2 }}>
-            <Typography variant="h6" gutterBottom>
-              Enter data to be decrypted
+          <Paper
+            sx={{
+              p: 3,
+              bgcolor: '#ffffff',
+              borderRadius: 2,
+              boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
+            }}
+          >
+            <Typography variant="h5" gutterBottom>
+              Decrypt Your Text
             </Typography>
 
             <TextField
-              label="Encrypted text"
+              label="Encrypted Text"
               variant="outlined"
               fullWidth
               multiline
               rows={4}
               value={encryptedText}
               onChange={(e) => setEncryptedText(e.target.value)}
-              onPaste={handlePaste}
-              sx={{ backgroundColor: '#2a2b3d', borderRadius: '4px' }}
+              sx={{
+                mt: 2,
+                '& .MuiOutlinedInput-root': {
+                  '& fieldset': { borderColor: '#ccc' },
+                  '&:hover fieldset': { borderColor: '#999' },
+                  '&.Mui-focused fieldset': { borderColor: '#4fc3f7' },
+                },
+              }}
             />
 
             <TextField
@@ -179,42 +202,79 @@ function DecryptPage() {
               fullWidth
               value={key}
               onChange={(e) => setKey(e.target.value)}
-              sx={{ backgroundColor: '#2a2b3d', borderRadius: '4px', mt: 2 }}
+              sx={{
+                mt: 2,
+                '& .MuiOutlinedInput-root': {
+                  '& fieldset': { borderColor: '#ccc' },
+                  '&:hover fieldset': { borderColor: '#999' },
+                  '&.Mui-focused fieldset': { borderColor: '#4fc3f7' },
+                },
+              }}
             />
 
             <TextField
-              label="Bitshift Matrices (List python format)"
+              label="Bitshift Matrices (JSON Format)"
               variant="outlined"
               fullWidth
               multiline
               rows={4}
               value={bitshiftMatrices}
               onChange={(e) => setBitshiftMatrices(e.target.value)}
-              sx={{ backgroundColor: '#2a2b3d', borderRadius: '4px', mt: 2 }}
+              sx={{
+                mt: 2,
+                '& .MuiOutlinedInput-root': {
+                  '& fieldset': { borderColor: '#ccc' },
+                  '&:hover fieldset': { borderColor: '#999' },
+                  '&.Mui-focused fieldset': { borderColor: '#4fc3f7' },
+                },
+              }}
             />
 
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
-              <Button variant="contained" color="primary" onClick={handleDecrypt}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={handleDecrypt}
+                sx={{ textTransform: 'none' }}
+              >
                 Decrypt
               </Button>
-              <Button variant="outlined" color="secondary" onClick={handleReset}>
+              <Button
+                variant="outlined"
+                color="secondary"
+                onClick={handleReset}
+                sx={{ textTransform: 'none' }}
+              >
                 Reset
               </Button>
-              <Button variant="contained" color="primary" onClick={handlePasteSpecial}>
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={handlePasteSpecial}
+                sx={{ textTransform: 'none' }}
+              >
                 Paste Special
               </Button>
             </Box>
           </Paper>
 
           {decryptedText && (
-            <Box sx={{ mt: 3 }}>
-              <Typography variant="h6" color="#4fc3f7">
-                Decrypted Text:
+            <Paper
+              sx={{
+                p: 3,
+                bgcolor: '#ffffff',
+                borderRadius: 2,
+                mt: 3,
+                boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
+              }}
+            >
+              <Typography variant="h6" color="primary">
+                Decrypted Text
               </Typography>
-              <Typography variant="body1" color="#ffffff">
+              <Typography variant="body1" sx={{ mt: 1 }}>
                 {decryptedText}
               </Typography>
-            </Box>
+            </Paper>
           )}
         </Grid>
       </Grid>
@@ -226,7 +286,11 @@ function DecryptPage() {
         onClose={() => setOpenSnackbar(false)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert onClose={() => setOpenSnackbar(false)} severity={isInvalidFormat ? 'error' : 'success'} sx={{ width: '100%' }}>
+        <Alert
+          onClose={() => setOpenSnackbar(false)}
+          severity={isInvalidFormat ? 'error' : 'success'}
+          sx={{ width: '100%' }}
+        >
           {snackbarMessage}
         </Alert>
       </Snackbar>

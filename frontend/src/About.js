@@ -1,6 +1,14 @@
 // About.js
 
 import React, { useState, useEffect } from 'react';
+import {
+  Box,
+  Typography,
+  Paper,
+  ToggleButton,
+  ToggleButtonGroup,
+  Divider,
+} from '@mui/material';
 import FlowDiagram from './FlowDiagram';
 import StateMatrix from './StateMatrix';
 import { simulateEncryption, simulateDecryption } from './encryptionSimulation';
@@ -35,7 +43,7 @@ const About = () => {
   }, [plaintext, key, mode]);
 
   const handleNodeClick = (_, node) => {
-    const step = steps.find(s => s.id === node.id);
+    const step = steps.find((s) => s.id === node.id);
     if (step) {
       setCurrentStepId(step.id);
       setCurrentMatrix(step.matrix);
@@ -44,51 +52,105 @@ const About = () => {
     }
   };
 
-  const handleModeChange = (newMode) => {
-    setMode(newMode);
+  const handleModeChange = (event, newMode) => {
+    if (newMode !== null) {
+      setMode(newMode);
+    }
   };
 
   return (
-    <div style={{ padding: '20px' }}>
-      <h1>About This Encryption Algorithm</h1>
-      <p>
-        This page visualizes a custom implementation of the AES encryption algorithm using hardcoded example data.
-      </p>
-      <h2>Example Data</h2>
-      <p><strong>Plaintext:</strong> {plaintext}</p>
-      <p><strong>Key:</strong> {key}</p>
-      <div>
-        <button onClick={() => handleModeChange('encryption')} disabled={mode === 'encryption'}>
-          Encryption
-        </button>
-        <button onClick={() => handleModeChange('decryption')} disabled={mode === 'decryption'}>
-          Decryption
-        </button>
-      </div>
-      <h2>{mode === 'encryption' ? 'Encryption' : 'Decryption'} Visualization</h2>
-      <div style={{ display: 'flex', alignItems: 'flex-start' }}>
-        <FlowDiagram steps={steps} currentStep={currentStepId} onNodeClick={handleNodeClick} />
-        <div style={{ marginLeft: '20px', flexGrow: 1 }}>
-          <h3>{steps.find(s => s.id === currentStepId)?.label}</h3>
-          <p><strong>Current Text Representation:</strong> {currentText}</p>
-          {currentMatrix && (
-            <>
-              <h4>State Matrix</h4>
-              <StateMatrix matrix={currentMatrix} />
-            </>
-          )}
-          {currentRoundKey && (
-            <>
-              <h4>Round Key</h4>
-              <StateMatrix matrix={currentRoundKey} />
-            </>
-          )}
-          {steps.find(s => s.id === currentStepId)?.explanation && (
-            <p><strong>Explanation:</strong> {steps.find(s => s.id === currentStepId).explanation}</p>
-          )}
-        </div>
-      </div>
-    </div>
+    <Box
+      sx={{
+        p: 3,
+        bgcolor: '#f5f5f5',
+        color: '#333',
+        minHeight: '100vh',
+        fontFamily: 'Raleway, sans-serif',
+      }}
+    >
+      <Paper
+        sx={{
+          p: 3,
+          bgcolor: '#ffffff',
+          borderRadius: 2,
+          boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
+        }}
+      >
+        <Typography variant="h4" gutterBottom>
+          About This Encryption Algorithm
+        </Typography>
+        <Typography variant="body1" paragraph>
+          This page visualizes a custom implementation of the AES encryption algorithm using hardcoded example data.
+        </Typography>
+        <Divider sx={{ my: 2 }} />
+        <Typography variant="h5" gutterBottom>
+          Example Data
+        </Typography>
+        <Typography variant="body1">
+          <strong>Plaintext:</strong> {plaintext}
+        </Typography>
+        <Typography variant="body1">
+          <strong>Key:</strong> {key}
+        </Typography>
+        <Box sx={{ mt: 3 }}>
+          <ToggleButtonGroup
+            value={mode}
+            exclusive
+            onChange={handleModeChange}
+            aria-label="Encryption mode"
+          >
+            <ToggleButton value="encryption" aria-label="encryption mode">
+              Encryption
+            </ToggleButton>
+            <ToggleButton value="decryption" aria-label="decryption mode">
+              Decryption
+            </ToggleButton>
+          </ToggleButtonGroup>
+        </Box>
+        <Typography variant="h5" sx={{ mt: 3 }}>
+          {mode === 'encryption' ? 'Encryption' : 'Decryption'} Visualization
+        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', mt: 3 }}>
+          <Box sx={{ flex: 1 }}>
+            <FlowDiagram
+              steps={steps}
+              currentStep={currentStepId}
+              onNodeClick={handleNodeClick}
+            />
+          </Box>
+          <Box sx={{ ml: 4, flex: 1 }}>
+            <Typography variant="h6" gutterBottom>
+              {steps.find((s) => s.id === currentStepId)?.label}
+            </Typography>
+            <Typography variant="body1">
+              <strong>Current Text Representation:</strong> {currentText}
+            </Typography>
+            {currentMatrix && (
+              <>
+                <Typography variant="subtitle1" sx={{ mt: 2 }}>
+                  State Matrix
+                </Typography>
+                <StateMatrix matrix={currentMatrix} />
+              </>
+            )}
+            {currentRoundKey && (
+              <>
+                <Typography variant="subtitle1" sx={{ mt: 2 }}>
+                  Round Key
+                </Typography>
+                <StateMatrix matrix={currentRoundKey} />
+              </>
+            )}
+            {steps.find((s) => s.id === currentStepId)?.explanation && (
+              <Typography variant="body2" sx={{ mt: 2 }}>
+                <strong>Explanation:</strong>{' '}
+                {steps.find((s) => s.id === currentStepId).explanation}
+              </Typography>
+            )}
+          </Box>
+        </Box>
+      </Paper>
+    </Box>
   );
 };
 
