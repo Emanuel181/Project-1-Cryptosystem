@@ -30,7 +30,7 @@ def encrypt(text, key_bytes):
 
     encrypted_matrices = []
     bitshift_bits_matrices = []
-    all_round_details = []  # Collect all rounds for UI display
+    all_round_details = []
 
     for block_index, matrix in enumerate(matrices):
         encrypted_matrix, bitshift_bits_matrix, round_details = encrypt_block(matrix, round_keys, sbox)

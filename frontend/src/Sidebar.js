@@ -10,7 +10,16 @@ import {
   TextField,
 } from '@mui/material';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBars, faLock, faUnlock, faInfoCircle, faSearch, faUserCircle } from '@fortawesome/free-solid-svg-icons';
+import {
+    faBars,
+    faLock,
+    faUnlock,
+    faInfoCircle,
+    faSearch,
+    faUserCircle,
+    faHammer,
+    faChartLine
+} from '@fortawesome/free-solid-svg-icons';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
@@ -135,6 +144,7 @@ function Sidebar() {
                 {!isCollapsed && 'Encrypt'}
               </Button>
             </motion.div>
+
             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
               <Button
                 startIcon={!isCollapsed && <FontAwesomeIcon icon={faUnlock} />}
@@ -151,6 +161,44 @@ function Sidebar() {
                 }}
               >
                 {!isCollapsed && 'Decrypt'}
+              </Button>
+            </motion.div>
+               {/* Brute Force Button */}
+            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+              <Button
+                startIcon={!isCollapsed && <FontAwesomeIcon icon={faHammer} />}
+                onClick={() => navigate('/bruteforce')}
+                fullWidth
+                sx={{
+                  justifyContent: 'flex-start',
+                  backgroundColor: isActive('/bruteforce') ? '#4fc3f7' : '#2b2d3b',
+                  color: isActive('/bruteforce') ? '#1e1e2d' : '#fff',
+                  textTransform: 'none',
+                  fontSize: '1rem',
+                  fontWeight: 'medium',
+                  '&:hover': { backgroundColor: '#3c3d4e' },
+                }}
+              >
+                {!isCollapsed && 'Brute Force'}
+              </Button>
+            </motion.div>
+              {/* Side Channel Button */}
+            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+              <Button
+                startIcon={!isCollapsed && <FontAwesomeIcon icon={faChartLine} />}
+                onClick={() => navigate('/sidechannel')}
+                fullWidth
+                sx={{
+                  justifyContent: 'flex-start',
+                  backgroundColor: isActive('/sidechannel') ? '#4fc3f7' : '#2b2d3b',
+                  color: isActive('/sidechannel') ? '#1e1e2d' : '#fff',
+                  textTransform: 'none',
+                  fontSize: '1rem',
+                  fontWeight: 'medium',
+                  '&:hover': { backgroundColor: '#3c3d4e' },
+                }}
+              >
+                {!isCollapsed && 'Side Channel'}
               </Button>
             </motion.div>
           </Collapse>
@@ -179,6 +227,7 @@ function Sidebar() {
               {!isCollapsed && 'About'}
             </Button>
           </motion.div>
+
         </Tooltip>
 
         <Collapse in={!isCollapsed}>

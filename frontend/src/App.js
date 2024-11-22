@@ -5,6 +5,8 @@ import DecryptPage from './DecryptPage';
 import Sidebar from './Sidebar';
 import {Box} from "@mui/material";
 import About from './About';
+import BruteForcePage from './BruteForcePage';
+import SideChannel from './SideChannelTestPage'
 
 function App() {
   return (
@@ -17,6 +19,9 @@ function App() {
             <Route path="/" element={<Navigate to="/encrypt" />} />  {/* Redirect root to /encrypt */}
             <Route path="/decrypt" element={<DecryptPage />} />
             <Route path="/about" element={<About />} />
+            <Route path="/bruteforce" element={<BruteForcePage />} />
+            <Route path="/sidechannel" element={<SideChannel />} />
+
           </Routes>
         </Box>
       </Box>

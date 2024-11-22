@@ -1,12 +1,22 @@
+import base64
+import json
 import math
+import queue
+import threading
+import time
 from collections import Counter
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, Response
 from flask_cors import CORS
 import secrets
 from encryption import encrypt
 from encryption import decrypt
 import numpy as np
 from scipy.stats import chisquare, skew, kurtosis
+import pyRAPL
+import tracemalloc
+import wmi
+import win32com.client
+
 
 app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": "http://localhost:3000"}})
@@ -174,7 +184,307 @@ def api_decrypt():
 
     return jsonify({'decrypted_text': decrypted_text})
 
+def brute_force_worker(encrypted_text, correct_key, max_attempts, thread_id, result_queue, shared_state):
+    """
+    Worker function to attempt decryption with random keys.
+    """
+    lock, found_key = shared_state
+    attempts = 0
+
+    for _ in range(max_attempts):
+        with lock:
+            if shared_state[1] is not None:  # Check if key is already found
+                break
+
+        candidate_key = secrets.token_bytes(32)  # Generate a random 256-bit key
+        attempts += 1
+
+        # Report the attempt
+        result_queue.put({
+            "status": "trying",
+            "key": candidate_key.hex(),
+            "thread_id": thread_id,
+            "attempts": attempts,
+        })
+
+        # Check if the key matches
+        if candidate_key == correct_key:
+            with lock:
+                shared_state[1] = candidate_key  # Update found_key
+            # Report success
+            result_queue.put({
+                "status": "success",
+                "key": candidate_key.hex(),
+                "thread_id": thread_id,
+                "attempts": attempts,
+            })
+            return  # Exit the worker
+
+    # If the loop completes without finding the key
+    result_queue.put({
+        "status": "thread_complete",
+        "thread_id": thread_id,
+        "attempts": attempts,
+    })
+
+@app.route("/api/bruteforce_stream", methods=["GET"])
+def brute_force_stream():
+    """
+    API endpoint to handle brute force simulation.
+    """
+    encrypted_text = request.args.get("encrypted_text", "")
+    expected_plaintext = request.args.get("expected_plaintext", "")
+    max_attempts = int(request.args.get("max_attempts", 10000))
+
+    if not encrypted_text or not expected_plaintext or max_attempts <= 0:
+        return Response(
+            json.dumps({"error": "Invalid input"}),
+            status=400,
+            content_type="application/json",
+        )
+
+    # Generate a mock correct key for this session
+    correct_key = secrets.token_bytes(32)
+    print(f"[DEBUG] Correct Key (hex): {correct_key.hex()}")  # Debugging purposes
+
+    def generate():
+        # Create new shared state for this request
+        lock, found_key = threading.Lock(), None
+        shared_state = [lock, found_key]  # Use a list to allow mutable updates
+
+        result_queue = queue.Queue()
+
+        max_workers = 4
+        threads = []
+        # Distribute remaining attempts to ensure total attempts equal to max_attempts
+        base_attempts_per_thread = max_attempts // max_workers
+        attempts_distribution = [base_attempts_per_thread] * max_workers
+        for i in range(max_attempts % max_workers):
+            attempts_distribution[i] += 1
+
+        # Start worker threads
+        for i in range(max_workers):
+            t = threading.Thread(
+                target=brute_force_worker,
+                args=(
+                    encrypted_text,
+                    correct_key,
+                    attempts_distribution[i],
+                    i,
+                    result_queue,
+                    shared_state,
+                )
+            )
+            t.start()
+            threads.append(t)
+
+        # Collect results until all threads are done
+        threads_alive = max_workers
+        while threads_alive > 0 or not result_queue.empty():
+            try:
+                result = result_queue.get(timeout=1)
+                yield f"data: {json.dumps(result)}\n\n"
+                if result["status"] == "success":
+                    # Key found, no need to wait for other threads
+                    break
+                elif result["status"] == "thread_complete":
+                    threads_alive -= 1
+            except queue.Empty:
+                pass
+
+        # Wait for all threads to finish
+        for t in threads:
+            t.join()
+
+        # Once all threads are done, check if key was found
+        with shared_state[0]:
+            if shared_state[1] is None:
+                yield f"data: {json.dumps({'status': 'failure', 'message': 'Exhausted all attempts.'})}\n\n"
+            else:
+                # Key was found, already reported
+                pass
+
+    return Response(generate(), content_type="text/event-stream")
+
+
+def timing_analysis(input_text, key_bytes):
+    """
+    Measures execution time of the encryption process in microseconds.
+    """
+    num_attempts = 100
+    timings = []
+
+    for _ in range(num_attempts):
+        start_time = time.perf_counter()
+        encrypt(input_text, key_bytes)
+        end_time = time.perf_counter()
+        timings.append((end_time - start_time) * 1e6)  # Convert to microseconds
+
+    return timings
+
+
+def cache_timing_analysis(input_text, key_bytes):
+    """
+    Measures the execution time with induced cache misses.
+    """
+    num_attempts = 100
+    timings = []
+    large_data = bytearray(20 * 1024 * 1024)  # 20 MB data to exceed typical CPU cache size
+
+    for _ in range(num_attempts):
+        # Access the large data to flush the cache
+        for i in range(0, len(large_data), 4096):
+            large_data[i] = (large_data[i] + 1) % 256
+
+        start_time = time.perf_counter()
+        encrypt(input_text, key_bytes)
+        end_time = time.perf_counter()
+        timings.append((end_time - start_time) * 1e6)  # Microseconds
+
+    return timings
+
+def get_cpu_temperature():
+    try:
+        obj = win32com.client.GetObject("wingnuts:\\\\.\\root\\WMI")
+        sensors = obj.ExecQuery("SELECT * FROM MSAcpi_ThermalZoneTemperature")
+        temperatures = []
+        for sensor in sensors:
+            # Temperature is reported in tenths of degrees Kelvin
+            temp_kelvin = sensor.CurrentTemperature / 10
+            # Convert to Celsius
+            temp_celsius = temp_kelvin - 273.15
+            temperatures.append(temp_celsius)
+        if temperatures:
+            return sum(temperatures) / len(temperatures)
+        else:
+            return None
+    except Exception as e:
+        print(f"Error reading temperature: {e}")
+        return None
+
+
+def power_consumption_analysis(input_text, key_bytes):
+    """
+    Measures temperature change during encryption as a proxy for power consumption.
+    """
+    num_attempts = 10  # Reduce the number of attempts due to potential temperature sensor delays
+    temperature_changes = []
+
+    for _ in range(num_attempts):
+        # Get initial CPU temperature
+        temp_before = get_cpu_temperature()
+        if temp_before is None:
+            raise Exception("Could not read CPU temperature. Ensure Open Hardware Monitor is running.")
+
+        # Perform encryption
+        encrypt(input_text, key_bytes)
+
+        # Get CPU temperature after encryption
+        temp_after = get_cpu_temperature()
+        if temp_after is None:
+            raise Exception("Could not read CPU temperature after encryption.")
+
+        # Calculate temperature change
+        temp_change = temp_after - temp_before
+        temperature_changes.append(temp_change)
+
+    return temperature_changes
+
+
+def memory_access_pattern_analysis(input_text, key_bytes):
+    """
+    Measures memory allocation patterns during encryption.
+    """
+    num_attempts = 10  # Number of attempts to observe access patterns
+    memory_patterns = []
+
+    for _ in range(num_attempts):
+        tracemalloc.start()  # Start tracing memory allocations
+
+        # Perform encryption
+        encrypt(input_text, key_bytes)
+
+        # Take a snapshot of memory usage
+        snapshot = tracemalloc.take_snapshot()
+        tracemalloc.stop()  # Stop tracing
+
+        # Analyze memory usage
+        memory_stats = []
+        for stat in snapshot.statistics('lineno'):
+            memory_stats.append({
+                'line': stat.traceback.format()[-1],  # Line of code
+                'size': stat.size / 1024,  # Memory size in KB
+                'count': stat.count,  # Number of allocations
+            })
+
+        memory_patterns.append(memory_stats)
+
+    return memory_patterns
+
+
+def hamming_weight_analysis(input_text, key_bytes):
+    """
+    Calculates the Hamming weight of the encrypted data.
+    """
+    num_attempts = 100
+    hamming_weights = []
+
+    for _ in range(num_attempts):
+        # Unpack the tuple returned by encrypt
+        encrypted_text_base64, _, _ = encrypt(input_text, key_bytes)
+        # Decode the base64 encoded encrypted text
+        encrypted_bytes = base64.b64decode(encrypted_text_base64.encode('ascii'))
+        # Calculate Hamming weight
+        hamming_weight = sum(bin(byte).count('1') for byte in encrypted_bytes)
+        hamming_weights.append(hamming_weight)
+
+    return hamming_weights
+
+
+
+# API Endpoint
+@app.route('/api/side_channel_test', methods=['POST'])
+def side_channel_test():
+    data = request.get_json()
+    input_text = data.get('input_text', '')
+    test_type = data.get('test_type', 'timing')
+
+    if not input_text:
+        return jsonify({'error': 'No input text provided'}), 400
+
+    key_bytes = secrets.token_bytes(32)  # Generate a random key for testing
+
+    try:
+        results = {}
+        if test_type == 'timing':
+            analysis_results = timing_analysis(input_text, key_bytes)
+            results[test_type] = analysis_results
+        elif test_type == 'cache':
+            analysis_results = cache_timing_analysis(input_text, key_bytes)
+            results[test_type] = analysis_results
+        elif test_type == 'power':
+            analysis_results = power_consumption_analysis(input_text, key_bytes)
+            results[test_type] = analysis_results
+        elif test_type == 'memory':
+            analysis_results = memory_access_pattern_analysis(input_text, key_bytes)
+            results[test_type] = analysis_results
+        elif test_type == 'hamming':
+            analysis_results = hamming_weight_analysis(input_text, key_bytes)
+            results[test_type] = analysis_results
+        elif test_type == 'all':
+            # Run all tests
+            results['timing'] = timing_analysis(input_text, key_bytes)
+            results['cache'] = cache_timing_analysis(input_text, key_bytes)
+            results['power'] = power_consumption_analysis(input_text, key_bytes)
+            results['memory'] = memory_access_pattern_analysis(input_text, key_bytes)
+            results['hamming'] = hamming_weight_analysis(input_text, key_bytes)
+        else:
+            return jsonify({'error': 'Invalid test type provided'}), 400
+
+        return jsonify({'status': 'success', 'results': results})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, threaded=True, port=5000)
