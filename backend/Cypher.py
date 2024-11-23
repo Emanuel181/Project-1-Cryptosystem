@@ -67,21 +67,25 @@ def encrypt_block(matrix, round_keys, sbox):
 
 
 def decrypt_block(encrypted_matrix, bitshift_bits_matrix, round_keys, inverse_sbox):
-    state = [row[:] for row in encrypted_matrix]
+    state = [row[:] for row in encrypted_matrix]  # Copy the encrypted matrix
 
-    # Initial AddRoundKey
+    # Initial AddRoundKey (for the final round)
     state = add_round_key(state, round_keys[14])
 
-    # Main Rounds
+    # Final Round (Round 14): No Inverse MixColumns
+    state = inverse_shift_rows(state)
+    state = apply_sbox(state, inverse_sbox)
+    state = add_round_key(state, round_keys[13])
+
+    # Main Rounds (Rounds 13 to 1): Include Inverse MixColumns
     for round in range(13, 0, -1):
         state = inverse_shift_rows(state)
         state = apply_sbox(state, inverse_sbox)
         state = add_round_key(state, round_keys[round])
-        state = inverse_mix_columns(state)
+        if round > 1:  # Exclude Inverse MixColumns for Round 1
+            state = inverse_mix_columns(state)
 
-    # Final Round (without InvMixColumns)
-    state = inverse_shift_rows(state)
-    state = apply_sbox(state, inverse_sbox)
+    # Final AddRoundKey for Round 0
     state = add_round_key(state, round_keys[0])
 
     # Apply custom Transpose
@@ -91,6 +95,7 @@ def decrypt_block(encrypted_matrix, bitshift_bits_matrix, round_keys, inverse_sb
     state = bitshift_layer(state, shift_right=False, bitshift_bits_matrix=bitshift_bits_matrix)
 
     return state
+
 
 
 

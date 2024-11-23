@@ -1,5 +1,5 @@
-// encryptionSimulation.js
 
+// Simulate Encryption Process
 import { STANDARD_S_BOX, INVERSE_S_BOX } from './sbox';
 
 // Simulate Encryption Process
@@ -12,7 +12,7 @@ export function simulateEncryption(plaintext, key) {
     label: 'Plaintext Matrix',
     matrix: initialMatrix,
     text: initialText,
-    explanation: 'This is the initial state matrix derived from the plaintext.'
+    explanation: 'This is the initial state matrix derived from the plaintext.',
   });
 
   // Step 1: Custom Bitshift Layer
@@ -24,7 +24,7 @@ export function simulateEncryption(plaintext, key) {
     label: 'Custom Bitshift Layer',
     matrix: bitshiftMatrix,
     text: bitshiftText,
-    explanation: 'Bits of the state matrix are shifted according to the custom bitshift layer.'
+    explanation: 'Bits of the state matrix are shifted according to the custom bitshift layer.',
   });
 
   // Step 2: Custom Transpose
@@ -35,7 +35,7 @@ export function simulateEncryption(plaintext, key) {
     label: 'Custom Transpose',
     matrix: transposeMatrix,
     text: transposeText,
-    explanation: 'The state matrix is transposed (rows and columns are swapped).'
+    explanation: 'The state matrix is transposed (rows and columns are swapped).',
   });
 
   // Key Expansion
@@ -50,7 +50,7 @@ export function simulateEncryption(plaintext, key) {
     matrix: currentMatrix,
     text: currentText,
     roundKey: roundKeys[0],
-    explanation: 'The round key for round 0 is added to the state matrix using XOR.'
+    explanation: 'The round key for round 0 is added to the state matrix using XOR.',
   });
 
   // Main Rounds (1 to 13)
@@ -62,7 +62,7 @@ export function simulateEncryption(plaintext, key) {
       label: `SubBytes (Round ${round})`,
       matrix: currentMatrix,
       text: currentText,
-      explanation: 'Each byte of the state matrix is substituted using the S-Box.'
+      explanation: 'Each byte of the state matrix is substituted using the S-Box.',
     });
 
     currentMatrix = shiftRows(currentMatrix);
@@ -72,7 +72,7 @@ export function simulateEncryption(plaintext, key) {
       label: `ShiftRows (Round ${round})`,
       matrix: currentMatrix,
       text: currentText,
-      explanation: 'Rows of the state matrix are shifted cyclically to the left.'
+      explanation: 'Rows of the state matrix are shifted cyclically to the left.',
     });
 
     currentMatrix = mixColumns(currentMatrix);
@@ -82,7 +82,7 @@ export function simulateEncryption(plaintext, key) {
       label: `MixColumns (Round ${round})`,
       matrix: currentMatrix,
       text: currentText,
-      explanation: 'Columns of the state matrix are mixed using Galois Field multiplication.'
+      explanation: 'Columns of the state matrix are mixed using Galois Field multiplication.',
     });
 
     currentMatrix = addRoundKey(currentMatrix, roundKeys[round]);
@@ -93,7 +93,7 @@ export function simulateEncryption(plaintext, key) {
       matrix: currentMatrix,
       text: currentText,
       roundKey: roundKeys[round],
-      explanation: `The round key for round ${round} is added to the state matrix using XOR.`
+      explanation: `The round key for round ${round} is added to the state matrix using XOR.`,
     });
   }
 
@@ -105,7 +105,7 @@ export function simulateEncryption(plaintext, key) {
     label: 'SubBytes (Round 14)',
     matrix: currentMatrix,
     text: currentText,
-    explanation: 'Final SubBytes operation.'
+    explanation: 'Final SubBytes operation.',
   });
 
   currentMatrix = shiftRows(currentMatrix);
@@ -115,7 +115,7 @@ export function simulateEncryption(plaintext, key) {
     label: 'ShiftRows (Round 14)',
     matrix: currentMatrix,
     text: currentText,
-    explanation: 'Final ShiftRows operation.'
+    explanation: 'Final ShiftRows operation.',
   });
 
   currentMatrix = addRoundKey(currentMatrix, roundKeys[14]);
@@ -126,7 +126,7 @@ export function simulateEncryption(plaintext, key) {
     matrix: currentMatrix,
     text: currentText,
     roundKey: roundKeys[14],
-    explanation: 'The final round key is added to the state matrix using XOR.'
+    explanation: 'The final round key is added to the state matrix using XOR.',
   });
 
   steps.push({
@@ -134,7 +134,7 @@ export function simulateEncryption(plaintext, key) {
     label: 'Ciphertext Matrix',
     matrix: currentMatrix,
     text: currentText,
-    explanation: 'The final state matrix represents the ciphertext.'
+    explanation: 'The final state matrix represents the ciphertext.',
   });
 
   return steps;
@@ -150,7 +150,7 @@ export function simulateDecryption(ciphertext, key) {
     label: 'Ciphertext Matrix',
     matrix: initialMatrix,
     text: initialText,
-    explanation: 'This is the initial state matrix derived from the ciphertext.'
+    explanation: 'This is the initial state matrix derived from the ciphertext.',
   });
 
   // Key Expansion
@@ -165,11 +165,55 @@ export function simulateDecryption(ciphertext, key) {
     matrix: currentMatrix,
     text: currentText,
     roundKey: roundKeys[14],
-    explanation: 'The round key for round 14 is added to the state matrix using XOR.'
+    explanation: 'The round key for round 14 is added to the state matrix using XOR.',
+  });
+
+  // Final Round (14): No Inverse MixColumns
+  currentMatrix = inverseShiftRows(currentMatrix);
+  currentText = matrixToText(currentMatrix);
+  steps.push({
+    id: 'inverseShiftRows14',
+    label: 'Inverse ShiftRows (Round 14)',
+    matrix: currentMatrix,
+    text: currentText,
+    explanation: 'Rows of the state matrix are shifted cyclically to the right.',
+  });
+
+  currentMatrix = inverseSubBytes(currentMatrix);
+  currentText = matrixToText(currentMatrix);
+  steps.push({
+    id: 'inverseSubBytes14',
+    label: 'Inverse SubBytes (Round 14)',
+    matrix: currentMatrix,
+    text: currentText,
+    explanation: 'Each byte of the state matrix is substituted using the inverse S-Box.',
   });
 
   // Main Rounds (13 to 1)
   for (let round = 13; round >= 1; round--) {
+    currentMatrix = addRoundKey(currentMatrix, roundKeys[round]);
+    currentText = matrixToText(currentMatrix);
+    steps.push({
+      id: `addRoundKey${round}`,
+      label: `Add Round Key (Round ${round})`,
+      matrix: currentMatrix,
+      text: currentText,
+      roundKey: roundKeys[round],
+      explanation: `The round key for round ${round} is added to the state matrix using XOR.`,
+    });
+
+    if (round > 1) {
+      currentMatrix = inverseMixColumns(currentMatrix);
+      currentText = matrixToText(currentMatrix);
+      steps.push({
+        id: `inverseMixColumns${round}`,
+        label: `Inverse MixColumns (Round ${round})`,
+        matrix: currentMatrix,
+        text: currentText,
+        explanation: 'Columns of the state matrix are mixed using inverse Galois Field multiplication.',
+      });
+    }
+
     currentMatrix = inverseShiftRows(currentMatrix);
     currentText = matrixToText(currentMatrix);
     steps.push({
@@ -177,7 +221,7 @@ export function simulateDecryption(ciphertext, key) {
       label: `Inverse ShiftRows (Round ${round})`,
       matrix: currentMatrix,
       text: currentText,
-      explanation: 'Rows of the state matrix are shifted cyclically to the right.'
+      explanation: 'Rows of the state matrix are shifted cyclically to the right.',
     });
 
     currentMatrix = inverseSubBytes(currentMatrix);
@@ -187,52 +231,11 @@ export function simulateDecryption(ciphertext, key) {
       label: `Inverse SubBytes (Round ${round})`,
       matrix: currentMatrix,
       text: currentText,
-      explanation: 'Each byte of the state matrix is substituted using the inverse S-Box.'
-    });
-
-    currentMatrix = addRoundKey(currentMatrix, roundKeys[round]);
-    currentText = matrixToText(currentMatrix);
-    steps.push({
-      id: `addRoundKey${round}`,
-      label: `Add Round Key (Round ${round})`,
-      matrix: currentMatrix,
-      text: currentText,
-      roundKey: roundKeys[round],
-      explanation: `The round key for round ${round} is added to the state matrix using XOR.`
-    });
-
-    currentMatrix = inverseMixColumns(currentMatrix);
-    currentText = matrixToText(currentMatrix);
-    steps.push({
-      id: `inverseMixColumns${round}`,
-      label: `Inverse MixColumns (Round ${round})`,
-      matrix: currentMatrix,
-      text: currentText,
-      explanation: 'Columns of the state matrix are mixed using inverse Galois Field multiplication.'
+      explanation: 'Each byte of the state matrix is substituted using the inverse S-Box.',
     });
   }
 
-  // Final Round (0)
-  currentMatrix = inverseShiftRows(currentMatrix);
-  currentText = matrixToText(currentMatrix);
-  steps.push({
-    id: 'inverseShiftRows0',
-    label: 'Inverse ShiftRows (Round 0)',
-    matrix: currentMatrix,
-    text: currentText,
-    explanation: 'Final Inverse ShiftRows operation.'
-  });
-
-  currentMatrix = inverseSubBytes(currentMatrix);
-  currentText = matrixToText(currentMatrix);
-  steps.push({
-    id: 'inverseSubBytes0',
-    label: 'Inverse SubBytes (Round 0)',
-    matrix: currentMatrix,
-    text: currentText,
-    explanation: 'Final Inverse SubBytes operation.'
-  });
-
+  // Final Add Round Key (0)
   currentMatrix = addRoundKey(currentMatrix, roundKeys[0]);
   currentText = matrixToText(currentMatrix);
   steps.push({
@@ -241,7 +244,7 @@ export function simulateDecryption(ciphertext, key) {
     matrix: currentMatrix,
     text: currentText,
     roundKey: roundKeys[0],
-    explanation: 'The round key for round 0 is added to the state matrix using XOR.'
+    explanation: 'The initial round key is added to the state matrix using XOR.',
   });
 
   // Inverse Custom Transpose
@@ -252,7 +255,7 @@ export function simulateDecryption(ciphertext, key) {
     label: 'Inverse Custom Transpose',
     matrix: currentMatrix,
     text: currentText,
-    explanation: 'The state matrix is transposed back to its original form.'
+    explanation: 'The state matrix is transposed back to its original form.',
   });
 
   // Inverse Custom Bitshift Layer
@@ -264,7 +267,7 @@ export function simulateDecryption(ciphertext, key) {
     label: 'Inverse Custom Bitshift Layer',
     matrix: currentMatrix,
     text: currentText,
-    explanation: 'Bits of the state matrix are shifted back to their original positions.'
+    explanation: 'Bits of the state matrix are shifted back to their original positions.',
   });
 
   steps.push({
@@ -272,11 +275,12 @@ export function simulateDecryption(ciphertext, key) {
     label: 'Plaintext Matrix',
     matrix: currentMatrix,
     text: currentText,
-    explanation: 'The final state matrix represents the recovered plaintext.'
+    explanation: 'The final state matrix represents the recovered plaintext.',
   });
 
   return steps;
 }
+
 
 // Helper Functions
 

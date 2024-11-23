@@ -38,7 +38,9 @@ function BruteForcePage() {
       max_attempts: maxAttempts,
     });
 
-    const eventSource = new EventSource(`http://localhost:5000/api/bruteforce_stream?${params.toString()}`);
+    const eventSource = new EventSource(
+      `http://localhost:5000/api/bruteforce_stream?${params.toString()}`
+    );
 
     eventSource.onmessage = (event) => {
       const data = JSON.parse(event.data);
@@ -87,7 +89,9 @@ function BruteForcePage() {
       if (parsedData) {
         setEncryptedText(parsedData.encryptedText);
         setExpectedPlaintext(parsedData.expectedPlaintext);
-        setMaxAttempts(10000);
+        if (parsedData.maxAttempts) {
+          setMaxAttempts(parsedData.maxAttempts);
+        }
         setSnackbarMessage('Data pasted successfully!');
         setIsInvalidFormat(false);
         setOpenSnackbar(true);
@@ -101,24 +105,32 @@ function BruteForcePage() {
       setOpenSnackbar(true);
     }
   };
+
   const parseInputData = (input) => {
-  // Match each section using regular expressions
-  const encryptedTextMatch = input.match(/Encrypted Text:\s*([\s\S]*?)\n\s*Expected Plaintext:/);
-  const expectedPlaintextMatch = input.match(/Expected Plaintext:\s*([\s\S]*?)\n\s*Max Attempts:/);
-  const maxAttemptsMatch = input.match(/Max Attempts:\s*(\d+)/);
+    // Try to match Input Text and Encrypted Text
+    const inputTextMatch = input.match(/Input Text:\s*([\s\S]*?)\n\s*Encrypted Text:/);
+    const encryptedTextMatch = input.match(/Encrypted Text:\s*([\s\S]*?)(?:\n|$)/);
 
-  // Validate matches and return the structured data
-  if (!encryptedTextMatch || !expectedPlaintextMatch || !maxAttemptsMatch) {
+    if (inputTextMatch && encryptedTextMatch) {
+      const expectedPlaintext = inputTextMatch[1].trim();
+      const encryptedText = encryptedTextMatch[1].trim();
+      return { expectedPlaintext, encryptedText };
+    } else {
+      // Try to match the other format
+      const encryptedTextMatch = input.match(/Encrypted Text:\s*([\s\S]*?)\n\s*Expected Plaintext:/);
+      const expectedPlaintextMatch = input.match(/Expected Plaintext:\s*([\s\S]*?)(?:\n|$)/);
+      const maxAttemptsMatch = input.match(/Max Attempts:\s*(\d+)/);
+
+      if (encryptedTextMatch && expectedPlaintextMatch) {
+        const encryptedText = encryptedTextMatch[1].trim();
+        const expectedPlaintext = expectedPlaintextMatch[1].trim();
+        const maxAttempts = maxAttemptsMatch ? parseInt(maxAttemptsMatch[1].trim(), 10) : null;
+        return { encryptedText, expectedPlaintext, maxAttempts };
+      }
+    }
+
     return null;
-  }
-
-  const encryptedText = encryptedTextMatch[1].trim();
-  const expectedPlaintext = expectedPlaintextMatch[1].trim();
-  const maxAttempts = parseInt(maxAttemptsMatch[1].trim(), 10);
-
-  return { encryptedText, expectedPlaintext, maxAttempts };
-};
-
+  };
 
   return (
     <Box

@@ -1,14 +1,8 @@
-// FlowDiagram.js
-
 import React from 'react';
-import ReactFlow, {
-  Controls,
-  Background,
-} from 'react-flow-renderer';
+import ReactFlow, { Controls, Background } from 'react-flow-renderer';
 import CustomNode from './CustomNode';
 import AnimatedEdge from './AnimatedEdge';
 import './FlowDiagram.css'; // Import the CSS file
-
 
 const FlowDiagram = ({ steps, currentStep, onNodeClick }) => {
   const nodeTypes = {
@@ -51,9 +45,19 @@ const FlowDiagram = ({ steps, currentStep, onNodeClick }) => {
         type: nodeType,
         icon: getNodeIcon(nodeType),
       },
-    position: { x: 50, y: index * 150 }, // Adjusted positions
+      position: { x: 50, y: index * 150 }, // Adjusted positions
       style: {
-      width: '200px', // Reduced width
+        width: '200px', // Adjusted width
+        padding: '10px',
+        border: currentStep === step.id ? '2px solid #4caf50' : '1px solid #ccc', // Highlight current step
+        backgroundColor: currentStep === step.id ? '#e8f5e9' : '#fff', // Light green for selected node
+        borderRadius: '8px',
+        boxShadow:
+          currentStep === step.id
+            ? '0 0 10px rgba(76, 175, 80, 0.8)' // Highlighted shadow
+            : '0 2px 4px rgba(0, 0, 0, 0.1)', // Default shadow
+        transition: 'all 0.3s ease',
+        cursor: 'pointer',
       },
     };
   });
@@ -68,7 +72,7 @@ const FlowDiagram = ({ steps, currentStep, onNodeClick }) => {
     style: { stroke: '#555' },
   }));
 
-return (
+  return (
     <div
       style={{
         height: '600px',

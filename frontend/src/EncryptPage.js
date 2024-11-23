@@ -72,8 +72,7 @@ const desiredRanges = {
   chi_squared_uniformity:
     'Chi-squared test should yield p-value > 0.05 for uniformity.',
   serial_correlation: 'Close to 0 for good diffusion.',
-  run_length:
-    'Varied run lengths; avoid too long or too short runs.',
+  run_length: 'Varied run lengths; avoid too long or too short runs.',
   block_entropy:
     'Higher entropy in blocks; closer to 8 for better randomness.',
   skewness_and_kurtosis:
@@ -98,9 +97,18 @@ function EncryptPage() {
   const [testSectionExpanded, setTestSectionExpanded] = useState(false);
   const [testButtonVisible, setTestButtonVisible] = useState(false);
   const [showTestResultsButton, setShowTestResultsButton] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarSeverity, setSnackbarSeverity] = useState('success');
 
   // Handlers
   const handleEncrypt = () => {
+    if (!inputText.trim()) {
+      setSnackbarMessage('Please enter text to encrypt.');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
+      return;
+    }
+
     axios
       .post('http://localhost:5000/api/encrypt', { text: inputText })
       .then((response) => {
@@ -112,15 +120,23 @@ function EncryptPage() {
         setTestButtonVisible(true);
         setShowTestResultsButton(false);
         setTestSectionExpanded(false);
+        setSnackbarMessage('Encryption successful!');
+        setSnackbarSeverity('success');
+        setSnackbarOpen(true);
       })
       .catch((error) => {
         console.error('There was an error!', error);
+        setSnackbarMessage('Encryption failed. Please try again.');
+        setSnackbarSeverity('error');
+        setSnackbarOpen(true);
       });
   };
 
   const handleTestEncryption = () => {
     if (!encryptedText) {
-      alert('Please encrypt text before testing.');
+      setSnackbarMessage('Please encrypt text before testing.');
+      setSnackbarSeverity('error');
+      setSnackbarOpen(true);
       return;
     }
 
@@ -135,6 +151,9 @@ function EncryptPage() {
       })
       .catch((error) => {
         console.error('Test encryption failed!', error);
+        setSnackbarMessage('Test encryption failed. Please try again.');
+        setSnackbarSeverity('error');
+        setSnackbarOpen(true);
       });
   };
 
@@ -148,6 +167,8 @@ function EncryptPage() {
     setTestButtonVisible(false);
     setShowTestResultsButton(false);
     setTestSectionExpanded(false);
+    setSnackbarMessage('');
+    setSnackbarSeverity('success');
   };
 
   const handleCopyKey = (copyAsBytes) => {
@@ -155,11 +176,15 @@ function EncryptPage() {
       ? stringToByteString(encryptionKey)
       : encryptionKey;
     navigator.clipboard.writeText(keyToCopy);
+    setSnackbarMessage('Key copied to clipboard!');
+    setSnackbarSeverity('success');
     setSnackbarOpen(true);
   };
 
   const handleCopyEncryptedText = () => {
     navigator.clipboard.writeText(encryptedText);
+    setSnackbarMessage('Encrypted text copied to clipboard!');
+    setSnackbarSeverity('success');
     setSnackbarOpen(true);
   };
 
@@ -168,25 +193,37 @@ function EncryptPage() {
   };
 
   const handleDialogClose = (format) => {
-    const keyToCopy =
-      format === 'human' ? encryptionKey : stringToByteString(encryptionKey);
-    const matricesToCopy =
-      format === 'human'
-        ? bitshiftMatrices
-            .map(
-              (matrix, index) =>
-                `Matrix ${index + 1}:\n` +
-                matrix.map((row) => row.join('\t')).join('\n')
-            )
-            .join('\n\n')
-        : JSON.stringify(bitshiftMatrices);
+    let dataToCopy = '';
 
-    const dataToCopy = `
+    if (format === 'human' || format === 'non-human') {
+      const keyToCopy =
+        format === 'human' ? encryptionKey : stringToByteString(encryptionKey);
+      const matricesToCopy =
+        format === 'human'
+          ? bitshiftMatrices
+              .map(
+                (matrix, index) =>
+                  `Matrix ${index + 1}:\n` +
+                  matrix.map((row) => row.join('\t')).join('\n')
+              )
+              .join('\n\n')
+          : JSON.stringify(bitshiftMatrices);
+
+      dataToCopy = `
 Encrypted Text: ${encryptedText}
 Key: ${keyToCopy}
 Bitshift Matrices: ${matricesToCopy}
 `;
-    navigator.clipboard.writeText(dataToCopy);
+    } else if (format === 'input-encrypted') {
+      dataToCopy = `
+Input Text: ${inputText}
+Encrypted Text: ${encryptedText}
+`;
+    }
+
+    navigator.clipboard.writeText(dataToCopy.trim());
+    setSnackbarMessage('Data copied to clipboard!');
+    setSnackbarSeverity('success');
     setSnackbarOpen(true);
     setOpenDialog(false);
   };
@@ -243,6 +280,8 @@ Bitshift Matrices: ${matricesToCopy}
     }
 
     navigator.clipboard.writeText(matricesToCopy);
+    setSnackbarMessage('Matrices copied to clipboard!');
+    setSnackbarSeverity('success');
     setSnackbarOpen(true);
   };
 
@@ -294,6 +333,7 @@ Bitshift Matrices: ${matricesToCopy}
                 variant="contained"
                 color="primary"
                 onClick={handleEncrypt}
+                disabled={!inputText.trim()}
                 sx={{ textTransform: 'none' }}
               >
                 Encrypt
@@ -702,16 +742,25 @@ Bitshift Matrices: ${matricesToCopy}
             fullWidth
             sx={{ mb: 2, textTransform: 'none' }}
           >
-            Human-readable
+            Copy Human-readable format
           </Button>
           <Button
             onClick={() => handleDialogClose('non-human')}
             variant="outlined"
             color="primary"
             fullWidth
+            sx={{ mb: 2, textTransform: 'none' }}
+          >
+            Copy Bytes Format (for decryption)
+          </Button>
+          <Button
+            onClick={() => handleDialogClose('input-encrypted')}
+            variant="outlined"
+            color="primary"
+            fullWidth
             sx={{ textTransform: 'none' }}
           >
-            Bytes Format
+            Copy Input Text and Encrypted Text (for brute force simulation)
           </Button>
         </DialogContent>
         <DialogActions>
@@ -725,19 +774,25 @@ Bitshift Matrices: ${matricesToCopy}
         </DialogActions>
       </Dialog>
 
-      {/* Snackbar for copied data message */}
+      {/* Snackbar for messages */}
       <Snackbar
         open={snackbarOpen}
         autoHideDuration={3000}
-        onClose={() => setSnackbarOpen(false)}
+        onClose={() => {
+          setSnackbarOpen(false);
+          setSnackbarMessage('');
+        }}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
         <Alert
-          onClose={() => setSnackbarOpen(false)}
-          severity="success"
+          onClose={() => {
+            setSnackbarOpen(false);
+            setSnackbarMessage('');
+          }}
+          severity={snackbarSeverity}
           sx={{ width: '100%' }}
         >
-          Data copied to clipboard!
+          {snackbarMessage}
         </Alert>
       </Snackbar>
     </Box>

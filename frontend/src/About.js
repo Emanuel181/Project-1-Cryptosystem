@@ -1,5 +1,3 @@
-// About.js
-
 import React, { useState, useEffect } from 'react';
 import {
   Box,
@@ -14,22 +12,30 @@ import StateMatrix from './StateMatrix';
 import { simulateEncryption, simulateDecryption } from './encryptionSimulation';
 
 const About = () => {
+  const generateKey = () => {
+    const array = new Uint8Array(32); // Generate a 32-byte key
+    window.crypto.getRandomValues(array); // Fill with secure random values
+    return Array.from(array)
+      .map((byte) => String.fromCharCode(byte)) // Convert each byte to a character
+      .join(''); // Join into a string
+  };
+
   const [steps, setSteps] = useState([]);
   const [currentStepId, setCurrentStepId] = useState('');
   const [currentMatrix, setCurrentMatrix] = useState(null);
   const [currentText, setCurrentText] = useState('');
   const [currentRoundKey, setCurrentRoundKey] = useState(null);
   const [plaintext] = useState('HELLO WORLD!!');
-  const [key] = useState('MYSECRETKEY123456');
+  const [key] = useState(() => generateKey());
   const [mode, setMode] = useState('encryption');
 
   useEffect(() => {
-    let simulationSteps;
+    let simulationSteps = [];
     if (mode === 'encryption') {
       simulationSteps = simulateEncryption(plaintext, key);
     } else {
       const encryptionSteps = simulateEncryption(plaintext, key);
-      const ciphertext = encryptionSteps[encryptionSteps.length - 1].text;
+      const ciphertext = encryptionSteps[encryptionSteps.length - 1]?.text || '';
       simulationSteps = simulateDecryption(ciphertext, key);
     }
     setSteps(simulationSteps);
@@ -39,6 +45,11 @@ const About = () => {
       setCurrentMatrix(initialStep.matrix);
       setCurrentText(initialStep.text);
       setCurrentRoundKey(initialStep.roundKey || null);
+    } else {
+      setCurrentStepId('');
+      setCurrentMatrix(null);
+      setCurrentText('');
+      setCurrentRoundKey(null);
     }
   }, [plaintext, key, mode]);
 
@@ -57,6 +68,10 @@ const About = () => {
       setMode(newMode);
     }
   };
+
+  const keyToHex = Array.from(key)
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
 
   return (
     <Box
@@ -80,29 +95,60 @@ const About = () => {
           About This Encryption Algorithm
         </Typography>
         <Typography variant="body1" paragraph>
-          This page visualizes a custom implementation of the AES encryption algorithm using hardcoded example data.
+          This page visualizes a custom implementation of the AES encryption algorithm using dynamically generated example data.
         </Typography>
         <Divider sx={{ my: 2 }} />
         <Typography variant="h5" gutterBottom>
           Example Data
         </Typography>
         <Typography variant="body1">
-          <strong>Plaintext:</strong> {plaintext}
+          <strong>Plaintext:</strong> {plaintext || 'No plaintext provided'}
         </Typography>
         <Typography variant="body1">
-          <strong>Key:</strong> {key}
+          <strong>Key:</strong> {keyToHex || 'No key provided'}
         </Typography>
-        <Box sx={{ mt: 3 }}>
+        <Box sx={{ mt: 3, textAlign: 'center' }}>
           <ToggleButtonGroup
             value={mode}
             exclusive
             onChange={handleModeChange}
-            aria-label="Encryption mode"
+            aria-label="Encryption mode toggle"
+            sx={{
+              borderRadius: '8px',
+              overflow: 'hidden',
+              boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+            }}
           >
-            <ToggleButton value="encryption" aria-label="encryption mode">
+            <ToggleButton
+              value="encryption"
+              aria-label="encryption mode"
+              sx={{
+                color: mode === 'encryption' ? '#fff' : '#333',
+                bgcolor: mode === 'encryption' ? '#4caf50' : '#e0e0e0',
+                fontWeight: mode === 'encryption' ? 'bold' : 'normal',
+                '&.Mui-selected': {
+                  color: '#fff',
+                  bgcolor: '#4caf50',
+                  '&:hover': { bgcolor: '#43a047' },
+                },
+              }}
+            >
               Encryption
             </ToggleButton>
-            <ToggleButton value="decryption" aria-label="decryption mode">
+            <ToggleButton
+              value="decryption"
+              aria-label="decryption mode"
+              sx={{
+                color: mode === 'decryption' ? '#fff' : '#333',
+                bgcolor: mode === 'decryption' ? '#2196f3' : '#e0e0e0',
+                fontWeight: mode === 'decryption' ? 'bold' : 'normal',
+                '&.Mui-selected': {
+                  color: '#fff',
+                  bgcolor: '#2196f3',
+                  '&:hover': { bgcolor: '#1976d2' },
+                },
+              }}
+            >
               Decryption
             </ToggleButton>
           </ToggleButtonGroup>
@@ -113,17 +159,18 @@ const About = () => {
         <Box sx={{ display: 'flex', alignItems: 'flex-start', mt: 3 }}>
           <Box sx={{ flex: 1 }}>
             <FlowDiagram
-              steps={steps}
+              steps={steps || []}
               currentStep={currentStepId}
               onNodeClick={handleNodeClick}
+              selectedNode={currentStepId} // Pass the selected node ID
             />
           </Box>
           <Box sx={{ ml: 4, flex: 1 }}>
             <Typography variant="h6" gutterBottom>
-              {steps.find((s) => s.id === currentStepId)?.label}
+              {steps.find((s) => s.id === currentStepId)?.label || 'No step selected'}
             </Typography>
             <Typography variant="body1">
-              <strong>Current Text Representation:</strong> {currentText}
+              <strong>Current Text Representation:</strong> {currentText || 'N/A'}
             </Typography>
             {currentMatrix && (
               <>
