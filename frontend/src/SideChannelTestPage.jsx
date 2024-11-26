@@ -43,16 +43,26 @@ function SideChannelTestPage() {
   const [testType, setTestType] = useState('timing');
   const [testResults, setTestResults] = useState(null);
   const [isTesting, setIsTesting] = useState(false);
+  const [numStrings, setNumStrings] = useState(1); // Number of strings for power consumption analysis
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [openSnackbar, setOpenSnackbar] = useState(false);
 
   // Reset testResults when testType changes
   useEffect(() => {
     setTestResults(null);
+    if (testType === 'power') {
+      setInputText(''); // Clear input text since it's auto-generated for power analysis
+    }
   }, [testType]);
 
   const handleStartTest = () => {
-    if (!inputText) {
+    if (testType === 'power' && numStrings < 1) {
+      setSnackbarMessage('Number of strings must be greater than 0.');
+      setOpenSnackbar(true);
+      return;
+    }
+
+    if (!inputText && testType !== 'power') {
       setSnackbarMessage('Please provide input text for testing.');
       setOpenSnackbar(true);
       return;
@@ -63,7 +73,11 @@ function SideChannelTestPage() {
     fetch('http://localhost:5000/api/side_channel_test', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ input_text: inputText, test_type: testType }),
+      body: JSON.stringify({
+        input_text: testType === 'power' ? undefined : inputText,
+        test_type: testType,
+        num_strings: testType === 'power' ? numStrings : undefined,
+      }),
     })
       .then((response) => response.json())
       .then((data) => {
@@ -72,7 +86,6 @@ function SideChannelTestPage() {
           setSnackbarMessage(data.error);
           setOpenSnackbar(true);
         } else {
-          // For 'all' test type, data.results is an object with each test type as keys
           if (testType === 'all') {
             setTestResults(data.results);
           } else {
@@ -95,19 +108,19 @@ function SideChannelTestPage() {
     setIsTesting(false);
     setSnackbarMessage('');
     setOpenSnackbar(false);
+    setNumStrings(1); // Reset the number of strings
   };
 
   const renderChartForTest = (testKey, testData) => {
-    const chartOptions = {
-      responsive: true,
-      plugins: {
-        legend: { position: 'top' },
-        title: { display: true, text: `${testKey.charAt(0).toUpperCase() + testKey.slice(1)} Analysis` },
-      },
-    };
+    if (['timing', 'cache', 'power', 'hamming'].includes(testKey)) {
+      const chartOptions = {
+        responsive: true,
+        plugins: {
+          legend: { position: 'top' },
+          title: { display: true, text: `${testKey.charAt(0).toUpperCase() + testKey.slice(1)} Analysis` },
+        },
+      };
 
-    if (testKey === 'timing' || testKey === 'cache' || testKey === 'power' || testKey === 'hamming') {
-      // Line chart for numerical array data
       return (
         <Paper
           key={testKey}
@@ -141,8 +154,7 @@ function SideChannelTestPage() {
     }
 
     if (testKey === 'memory') {
-      // For memory test, we need to process the data appropriately
-      // Since the data is a list of lists of memory stats, we'll aggregate the data
+      // For memory test, process the data appropriately
       const aggregatedStats = {};
 
       testData.forEach((attempt) => {
@@ -271,16 +283,28 @@ function SideChannelTestPage() {
               Side-Channel Testing
             </Typography>
 
-            <TextField
-              label="Input Text"
-              variant="outlined"
-              fullWidth
-              multiline
-              rows={4}
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              sx={{ mt: 2 }}
-            />
+            {testType === 'power' ? (
+              <TextField
+                label="Number of Strings"
+                type="number"
+                variant="outlined"
+                fullWidth
+                value={numStrings}
+                onChange={(e) => setNumStrings(parseInt(e.target.value) || 1)}
+                sx={{ mt: 2 }}
+              />
+            ) : (
+              <TextField
+                label="Input Text"
+                variant="outlined"
+                fullWidth
+                multiline
+                rows={4}
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                sx={{ mt: 2 }}
+              />
+            )}
 
             <FormControl fullWidth sx={{ mt: 2 }}>
               <InputLabel id="test-type-label">Select Test Type</InputLabel>
@@ -304,7 +328,11 @@ function SideChannelTestPage() {
                 variant="contained"
                 color="primary"
                 onClick={handleStartTest}
-                disabled={isTesting || !inputText}
+                disabled={
+                  isTesting ||
+                  (testType !== 'power' && !inputText) ||
+                  (testType === 'power' && numStrings < 1)
+                }
                 sx={{ textTransform: 'none' }}
               >
                 {isTesting ? <CircularProgress size={24} /> : 'Start Side-Channel Test'}

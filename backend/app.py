@@ -2,6 +2,8 @@ import base64
 import json
 import math
 import queue
+import random
+import string
 import threading
 import time
 from collections import Counter
@@ -16,6 +18,7 @@ import pyRAPL
 import tracemalloc
 import wmi
 import win32com.client
+import requests
 
 
 app = Flask(__name__)
@@ -343,53 +346,105 @@ def cache_timing_analysis(input_text, key_bytes):
 
     return timings
 
+
+import requests
+import json
+
 def get_cpu_temperature():
+    """
+    Fetches CPU temperature using OpenHardwareMonitor's web server.
+    """
     try:
-        obj = win32com.client.GetObject("wingnuts:\\\\.\\root\\WMI")
-        sensors = obj.ExecQuery("SELECT * FROM MSAcpi_ThermalZoneTemperature")
-        temperatures = []
-        for sensor in sensors:
-            # Temperature is reported in tenths of degrees Kelvin
-            temp_kelvin = sensor.CurrentTemperature / 10
-            # Convert to Celsius
-            temp_celsius = temp_kelvin - 273.15
-            temperatures.append(temp_celsius)
-        if temperatures:
-            return sum(temperatures) / len(temperatures)
+        # Replace with your actual OpenHardwareMonitor web server URL
+        url = "http://localhost:8085/data.json"
+        response = requests.get(url)
+        if response.status_code != 200:
+            raise Exception(f"Failed to fetch data: HTTP {response.status_code}")
+
+        data = response.json()
+
+        cpu_temperatures = []
+
+        # Recursive function to traverse the JSON tree
+        def traverse(node):
+            if 'Text' in node and 'Children' in node:
+                if 'Intel Core' in node['Text']:
+                    for child in node['Children']:
+                        if child['Text'] == 'Temperatures':
+                            for temp_sensor in child['Children']:
+                                # Get the temperature value, stripping '°C' and converting to float
+                                temp_value_str = temp_sensor.get('Value', '').replace('°C', '').strip()
+                                if temp_value_str:
+                                    temp_value = float(temp_value_str)
+                                    cpu_temperatures.append(temp_value)
+                else:
+                    for child in node['Children']:
+                        traverse(child)
+
+        # Start traversing from the root
+        for hardware in data.get('Children', []):
+            traverse(hardware)
+
+        if cpu_temperatures:
+            # Return the average CPU temperature
+            return sum(cpu_temperatures) / len(cpu_temperatures)
         else:
             return None
+
     except Exception as e:
         print(f"Error reading temperature: {e}")
         return None
 
 
-def power_consumption_analysis(input_text, key_bytes):
+
+def generate_random_string(length):
+    """
+    Generates a random string of a specified length.
+    """
+    return ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(length))
+
+def get_stabilized_temperature(readings=5, delay=0.2):
+    """
+    Collects multiple temperature readings and averages them for stability.
+    """
+    temps = []
+    for _ in range(readings):
+        temp = get_cpu_temperature()
+        if temp is not None:
+            temps.append(temp)
+        time.sleep(delay)  # Delay between readings
+    return sum(temps) / len(temps) if temps else None
+
+
+def power_consumption_analysis(num_strings, key_bytes):
     """
     Measures temperature change during encryption as a proxy for power consumption.
+    Encrypts a specified number of randomly generated strings.
     """
-    num_attempts = 10  # Reduce the number of attempts due to potential temperature sensor delays
     temperature_changes = []
 
-    for _ in range(num_attempts):
-        # Get initial CPU temperature
-        temp_before = get_cpu_temperature()
+    for _ in range(num_strings):
+        # Generate a random string for encryption
+        input_text = generate_random_string(10)
+
+        # Get stabilized initial CPU temperature
+        temp_before = get_stabilized_temperature()
         if temp_before is None:
-            raise Exception("Could not read CPU temperature. Ensure Open Hardware Monitor is running.")
+            raise Exception("Could not read CPU temperature. Ensure OpenHardwareMonitor is running and the web server is enabled.")
 
         # Perform encryption
         encrypt(input_text, key_bytes)
 
-        # Get CPU temperature after encryption
-        temp_after = get_cpu_temperature()
+        # Get stabilized temperature after encryption
+        temp_after = get_stabilized_temperature()
         if temp_after is None:
             raise Exception("Could not read CPU temperature after encryption.")
 
-        # Calculate temperature change
-        temp_change = temp_after - temp_before
+        # Calculate and normalize temperature change
+        temp_change = round(temp_after - temp_before, 2)  # Round to 2 decimals
         temperature_changes.append(temp_change)
 
     return temperature_changes
-
 
 def memory_access_pattern_analysis(input_text, key_bytes):
     """
@@ -446,13 +501,11 @@ def hamming_weight_analysis(input_text, key_bytes):
 @app.route('/api/side_channel_test', methods=['POST'])
 def side_channel_test():
     data = request.get_json()
-    input_text = data.get('input_text', '')
+    input_text = data.get('input_text', '')  # Default input_text for non-power tests
     test_type = data.get('test_type', 'timing')
+    num_strings = data.get('num_strings', 1)  # Default to 1 string for power analysis
 
-    if not input_text:
-        return jsonify({'error': 'No input text provided'}), 400
-
-    key_bytes = secrets.token_bytes(32)  # Generate a random key for testing
+    key_bytes = bytes(secrets.token_bytes(32))
 
     try:
         results = {}
@@ -463,7 +516,9 @@ def side_channel_test():
             analysis_results = cache_timing_analysis(input_text, key_bytes)
             results[test_type] = analysis_results
         elif test_type == 'power':
-            analysis_results = power_consumption_analysis(input_text, key_bytes)
+            if not isinstance(num_strings, int) or num_strings < 1:
+                return jsonify({'error': 'Invalid number of strings for power analysis'}), 400
+            analysis_results = power_consumption_analysis(num_strings, key_bytes)
             results[test_type] = analysis_results
         elif test_type == 'memory':
             analysis_results = memory_access_pattern_analysis(input_text, key_bytes)
@@ -475,7 +530,7 @@ def side_channel_test():
             # Run all tests
             results['timing'] = timing_analysis(input_text, key_bytes)
             results['cache'] = cache_timing_analysis(input_text, key_bytes)
-            results['power'] = power_consumption_analysis(input_text, key_bytes)
+            results['power'] = power_consumption_analysis(num_strings, key_bytes)
             results['memory'] = memory_access_pattern_analysis(input_text, key_bytes)
             results['hamming'] = hamming_weight_analysis(input_text, key_bytes)
         else:
